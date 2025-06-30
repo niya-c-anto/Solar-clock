@@ -1,2 +1,2 @@
-# Solar-clock
+# Solarclock
 Finding out the geopositions with solar clock.
