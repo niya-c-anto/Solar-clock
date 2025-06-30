@@ -1,0 +1,41 @@
+from astral import LocationInfo
+from astral.sun import sun
+from datetime import datetime, date
+from geopy.geocoders import Nominatim
+
+def get_location_name(latitude, longitude):
+    geolocator = Nominatim(user_agent="geoapi", language="en")  # Force English results
+    location = geolocator.reverse((latitude, longitude), exactly_one=True)
+    return location.address if location else "Unknown location"
+
+def get_sunrise_sunset(latitude, longitude):
+    city = LocationInfo("", "", "UTC", latitude, longitude)
+    s = sun(city.observer, date=date.today())
+
+    sunrise_time = s['sunrise'].strftime('%H:%M:%S')
+    sunset_time = s['sunset'].strftime('%H:%M:%S')
+
+    return sunrise_time, sunset_time
+
+# Get user input for coordinates
+latitude = float(input("Enter latitude: "))
+longitude = float(input("Enter longitude: "))
+
+# Get location name
+location_name = get_location_name(latitude, longitude)
+
+# Get sunrise and sunset times
+sunrise, sunset = get_sunrise_sunset(latitude, longitude)
+
+# Get current date and time
+current_date = date.today().strftime("%Y-%m-%d")
+current_time = datetime.now().strftime("%H:%M:%S")
+
+# Print results
+print("\n=== Location and Sun Data ===")
+print(f"Location: {location_name}")
+print(f"Date: {current_date}")
+print(f"Current Time: {current_time}")
+print(f"Sunrise: {sunrise}")
+print(f"Sunset: {sunset}")
+print("============================\n")
