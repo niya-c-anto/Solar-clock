@@ -1,41 +1,193 @@
+
+# Install necessary packages
+!pip install flask pyngrok astral geopy ephem
+
+from flask import Flask, request, render_template_string, send_file
+from pyngrok import ngrok
 from astral import LocationInfo
 from astral.sun import sun
-from datetime import datetime, date
 from geopy.geocoders import Nominatim
+from datetime import datetime, date
+import ephem, io
 
-def get_location_name(latitude, longitude):
-    geolocator = Nominatim(user_agent="geoapi", language="en")  # Force English results
-    location = geolocator.reverse((latitude, longitude), exactly_one=True)
-    return location.address if location else "Unknown location"
+# Replace with your ngrok token
+ngrok.set_auth_token("2vvmUR0olrXIuAiwKAD5MhbTRe5_24GrjzEyZSm6agYYj5yN")
 
-def get_sunrise_sunset(latitude, longitude):
-    city = LocationInfo("", "", "UTC", latitude, longitude)
-    s = sun(city.observer, date=date.today())
+app = Flask(__name__)
 
-    sunrise_time = s['sunrise'].strftime('%H:%M:%S')
-    sunset_time = s['sunset'].strftime('%H:%M:%S')
+@app.route("/", methods=["GET", "POST"])
+def solar_clock():
+    context = {
+        "place": "", "lat": "", "lon": "", "sunrise": "", "sunset": "", "noon": "",
+        "duration": "", "progress": "", "basic_plan": "", "error": "", "moon": "",
+        "prayers": {}, "date": date.today().isoformat()
+    }
 
-    return sunrise_time, sunset_time
+    if request.method == "POST":
+        place = request.form.get("place", "").strip()
+        selected_date = request.form.get("date") or date.today().isoformat()
+        context["date"] = selected_date
+        dt_obj = datetime.strptime(selected_date, "%Y-%m-%d")
 
-# Get user input for coordinates
-latitude = float(input("Enter latitude: "))
-longitude = float(input("Enter longitude: "))
+        try:
+            geolocator = Nominatim(user_agent="solarclock")
+            location = geolocator.geocode(place)
+            if not location:
+                raise ValueError("Location not found.")
 
-# Get location name
-location_name = get_location_name(latitude, longitude)
+            lat, lon = round(location.latitude, 5), round(location.longitude, 5)
+            context.update({"place": place.title(), "lat": lat, "lon": lon})
 
-# Get sunrise and sunset times
-sunrise, sunset = get_sunrise_sunset(latitude, longitude)
+            city = LocationInfo(place, "", "Asia/Kolkata", lat, lon)
+            s = sun(city.observer, dt_obj.date(), tzinfo=city.timezone)
 
-# Get current date and time
-current_date = date.today().strftime("%Y-%m-%d")
-current_time = datetime.now().strftime("%H:%M:%S")
+            sunrise, sunset = s["sunrise"], s["sunset"]
+            context.update({
+                "sunrise": sunrise.strftime("%I:%M %p"),
+                "sunset": sunset.strftime("%I:%M %p"),
+                "noon": s["noon"].strftime("%I:%M %p")
+            })
 
-# Print results
-print("\n=== Location and Sun Data ===")
-print(f"Location: {location_name}")
-print(f"Date: {current_date}")
-print(f"Current Time: {current_time}")
-print(f"Sunrise: {sunrise}")
-print(f"Sunset: {sunset}")
-print("============================\n")
+            duration = sunset - sunrise
+            h, m = divmod(duration.total_seconds() // 60, 60)
+            context["duration"] = f"{int(h)}h {int(m)}m"
+
+            now = datetime.now(sunrise.tzinfo)
+            if now < sunrise:
+                context["progress"] = "🌑 Before Sunrise"
+            elif now > sunset:
+                context["progress"] = "🌙 After Sunset"
+            else:
+                percent = int((now - sunrise).total_seconds() / (sunset - sunrise).total_seconds() * 100)
+                bar = "|" * (percent // 5)
+                dash = "-" * ((100 - percent) // 5)
+                context["progress"] = f"🌅{bar}☀️{dash}🌇"
+
+            context["basic_plan"] = ("""
+🌞 Suggested Plan:
+- Morning walk after sunrise
+- Productive work through the day
+- Outdoor activity before sunset
+- Relaxing evening routine
+""" if int(h) >= 12 else """
+🌥️ Suggested Plan:
+- Late start, indoor focus
+- Light afternoon tasks
+- Short outdoor break
+- Early evening wind-down
+""")
+
+            # 🌙 Moon phase
+            moon = ephem.Moon(dt_obj)
+            phase = moon.phase
+            emoji = "🌑🌒🌓🌔🌕🌖🌗🌘"[int((phase + 3.7) // 7.4) % 8]
+            context["moon"] = f"{emoji} {phase:.1f}%"
+
+            # 🕌 Niskar times
+            context["prayers"] = {
+                "Fajr": sunrise.replace(hour=sunrise.hour-1).strftime("%I:%M %p"),
+                "Dhuhr": s['noon'].strftime("%I:%M %p"),
+                "Asr": s['noon'].replace(hour=s['noon'].hour+3).strftime("%I:%M %p"),
+                "Maghrib": sunset.strftime("%I:%M %p"),
+                "Isha": sunset.replace(hour=sunset.hour+2).strftime("%I:%M %p"),
+            }
+
+        except Exception as e:
+            context["error"] = str(e)
+
+    html = render_html(context)
+    return render_template_string(html)
+
+@app.route("/download")
+def download():
+    data = request.args.get("data", "No data")
+    buffer = io.BytesIO()
+    buffer.write(data.encode())
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True, download_name="solar_info.txt", mimetype='text/plain')
+
+def render_html(ctx):
+    theme = "dark" if ctx["progress"].startswith("🌙") else "light"
+    dark_styles = "background:#222;color:white;"
+    light_styles = "background:#fdf6e3;color:black;"
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Solar Clock App</title>
+        <link rel=\"stylesheet\" href=\"https://unpkg.com/leaflet@1.9.3/dist/leaflet.css\"/>
+        <script src=\"https://unpkg.com/leaflet@1.9.3/dist/leaflet.js\"></script>
+        <style>
+            body {{ font-family: Arial; {dark_styles if theme=='dark' else light_styles} text-align: center; padding: 20px; }}
+            .box {{ background: #fff; color: #000; padding: 20px; border-radius: 12px; margin-top: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); display: inline-block; }}
+            input, button {{ padding: 10px; border-radius: 6px; margin: 5px; border: 1px solid #ccc; }}
+            .tab-btn {{ padding: 10px 15px; background: #ddd; border: none; border-radius: 6px; margin: 0 5px; cursor: pointer; }}
+            .tab-btn.active {{ background: #f39c12; color: white; }}
+            .tab-content {{ display: none; margin-top: 20px; }}
+            .tab-content.active {{ display: block; }}
+            #mapid {{ height: 300px; border-radius: 12px; }}
+            .topbar {{ position: absolute; top: 20px; right: 20px; }}
+        </style>
+        <script>
+            function showTab(id) {{
+                var tabs = document.getElementsByClassName('tab-content');
+                var btns = document.getElementsByClassName('tab-btn');
+                for (let i = 0; i < tabs.length; i++) {{
+                    tabs[i].classList.remove('active');
+                    btns[i].classList.remove('active');
+                }}
+                document.getElementById(id).classList.add('active');
+                document.getElementById('btn_' + id).classList.add('active');
+            }}
+        </script>
+    </head>
+    <body>
+        <div class="topbar">
+            <a href="/download?data=Place: {ctx['place']}\nDate: {ctx['date']}\nSunrise: {ctx['sunrise']}\nSunset: {ctx['sunset']}\nMoon: {ctx['moon']}">⬇️ Export</a>
+        </div>
+        <div class="box">
+            <h2>🌞 Solar Clock Dashboard</h2>
+            <form method="POST">
+                <input type="text" name="place" placeholder="Enter city, country" required>
+                <input type="date" name="date" value="{ctx['date']}">
+                <br><button type="submit">Get Info</button>
+            </form>
+
+            <div class="tabs">
+                <button class="tab-btn active" id="btn_tab1" onclick="showTab('tab1')">📊 Solar Info</button>
+                <button class="tab-btn" id="btn_tab2" onclick="showTab('tab2')">🗺️ Map</button>
+                <button class="tab-btn" id="btn_tab3" onclick="showTab('tab3')">🕌 Niskar</button>
+                <button class="tab-btn" id="btn_tab4" onclick="showTab('tab4')">🌙 Moon</button>
+            </div>
+
+            <div class="tab-content active" id="tab1">
+                <p>🌅 Sunrise: <strong>{ctx['sunrise']}</strong></p>
+                <p>🌞 Solar Noon: <strong>{ctx['noon']}</strong></p>
+                <p>🌇 Sunset: <strong>{ctx['sunset']}</strong></p>
+                <p>🕗 Daylight: <strong>{ctx['duration']}</strong></p>
+                <p>{ctx['progress']}</p>
+            </div>
+            <div class="tab-content" id="tab2">
+                <div id="mapid"></div>
+                <script>
+                    var map = L.map('mapid').setView([{ctx['lat']}, {ctx['lon']}], 10);
+                    L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png').addTo(map);
+                    L.marker([{ctx['lat']}, {ctx['lon']}]).addTo(map).bindPopup('{ctx['place']}').openPopup();
+                </script>
+            </div>
+            <div class="tab-content" id="tab3">
+                <ul>
+                    {''.join([f'<li>{k}: {v}</li>' for k,v in ctx['prayers'].items()])}
+                </ul>
+            </div>
+            <div class="tab-content" id="tab4">
+                <p>Moon Phase: <strong>{ctx['moon']}</strong></p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+public_url = ngrok.connect(5000)
+print("🚀 App running at:", public_url)
+app.run(port=5000)
