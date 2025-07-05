@@ -1,138 +1,190 @@
-# Solarclock
+**🌞 Solar Clock App**
 
-Finding out the geopositions with solar clock.
+The Solar Clock App is a web-based tool built using Flask that provides detailed solar information, Islamic prayer (Niskar) times, and moon phases based on a user's location. It features a dynamic light/dark theme, interactive map, date selection, and downloadable summaries — all accessible via a friendly tabbed interface.
 
 
 
-🌞 SolarClock - Sunrise \& Sunset Tracker
+**🔧 Features**
 
-SolarClock is a Python application that calculates the sunrise and sunset times for any given location using latitude and longitude. It's designed to help users understand daylight duration and optimize their schedules accordingly.
+🌅 Sunrise, Sunset, Solar Noon, and Daylight Duration
 
 
 
-🚀 Features
+🕌 Islamic Prayer (Niskar) Times
 
-🌍 Accepts user input (latitude \& longitude) or detects location automatically
 
 
+🌙 Moon Phase with Emoji
 
-🕰️ Displays local sunrise and sunset times
 
 
+🗺️ Interactive Map View of the Selected Location
 
-📆 Uses current system date (can be customized)
 
 
+🌓 Light/Dark Theme Based on Solar Time
 
-🧭 Optional: Converts coordinates to location name
 
 
+📅 Date Picker to See Future or Past Data
 
-🐍 Built using Python libraries: astral, geopy, and datetime
 
 
+📤 Download and Export Button for Solar Info Summary
 
-🛠️ Installation
 
-bash
 
-Copy
+**🚀 Tech Stack**
 
-Edit
+| Tech              | Purpose                                              |
 
-git clone https://github.com/yourusername/solarclock.git
+| ----------------- | ---------------------------------------------------- |
 
-cd solarclock
+| Flask             | Backend Web Framework                                |
 
-pip install -r requirements.txt
+| HTML/CSS/JS       | Frontend User Interface                              |
 
-Required Libraries:
+| Leaflet.js        | Interactive Mapping                                  |
 
+| Astral            | Compute sunrise/sunset and other solar data          |
 
+| Ephem             | Moon phase calculation                               |
 
-astral
+| Geopy + Nominatim | Geolocation from place name                          |
 
+| Pyngrok           | Publicly expose Flask app in Google Colab or locally |
 
 
-geopy
 
 
 
-datetime (built-in)
+**📦 Installation**
 
+pip install flask pyngrok astral geopy ephem
 
+🌐 How to Run (in Google Colab or locally)
 
-Install them with:
+Paste your ngrok token
 
+ngrok.set\_auth\_token("PASTE\_YOUR\_NGROK\_TOKEN")
 
+Run the app:
 
-bash
 
-Copy
 
-Edit
+public\_url = ngrok.connect(5000)
 
-pip install astral geopy
+print("🚀 App running at:", public\_url)
 
-🧪 Usage
+app.run(port=5000)
 
-python
+Open the printed public\_url in your browser to access the app.
 
-Copy
 
-Edit
 
-python solarclock.py
+**🧠 How It Works**
 
-You can also use it as a module and pass latitude \& longitude:
+1\. User Input
 
+User enters a location (e.g., "Kochi, India") and selects a date.
 
 
-python
 
-Copy
+A POST request is triggered.
 
-Edit
 
-from solarclock import get\_sun\_times
 
+2\. Geolocation
 
+The geopy library queries Nominatim (OpenStreetMap) to convert the location string into latitude and longitude.
 
-sunrise, sunset = get\_sun\_times(latitude=25.2048, longitude=55.2708)  # Dubai coords
 
-print("Sunrise:", sunrise)
 
-print("Sunset:", sunset)
+3\. Solar Calculations
 
-📷 Sample Output
+The astral library calculates:
 
-yaml
 
-Copy
 
-Edit
+🌅 Sunrise
 
-📍 Location: Dubai, United Arab Emirates
 
-📅 Date: 2025-06-30
 
-🌅 Sunrise: 05:32 AM
+🌇 Sunset
 
-🌇 Sunset : 07:15 PM
 
-💡 How It Works
 
-Uses Astral to compute sun positions based on geographic coordinates
+🌞 Solar Noon
 
 
 
-Optionally integrates geopy to reverse geocode the coordinates into city names
+🕗 Daylight Duration
 
 
 
-Great for location-aware solar planning, automation scripts, or education
+4\. Progress Bar
 
+The app compares the current time with sunrise/sunset to show a symbolic day progress bar:
 
 
 
+Example: 🌅||||☀️------🌇
+
+
+
+5\. Dynamic Theme
+
+If current time is before sunrise or after sunset, the theme switches to dark mode.
+
+
+
+6\. Moon Phase
+
+Uses ephem to calculate the moon phase as a percentage.
+
+
+
+A corresponding emoji is displayed:
+
+
+
+🌑, 🌒, 🌓, 🌔, 🌕, etc.
+
+
+
+7\. Niskar Timings
+
+Approximated based on solar events:
+
+
+
+Fajr = 1 hour before sunrise
+
+
+
+Dhuhr = Solar Noon
+
+
+
+Asr = 3 hours after Dhuhr
+
+
+
+Maghrib = Sunset
+
+
+
+Isha = 2 hours after Sunset
+
+
+
+8\. Interactive Map
+
+Leaflet.js shows the selected location with a zoomed-in map and marker.
+
+
+
+9\. Export Button
+
+Allows downloading a .txt file with the solar and moon info for the chosen location and date.
 
